@@ -21,9 +21,12 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"pproflame/internal/plugin"
@@ -63,7 +66,44 @@ func FetchSrcProfiles(option *plugin.Options, source string, httpHostPort string
 
 // RenderFetchedProfiles 渲染拉取的 pprof 数据到页面
 func RenderFetchedProfiles(p *profile.Profile, o *plugin.Options, wantBrowser bool) error {
+	host, port, err := getHostAndPort(hostport)
+	if err != nil {
+		return err
+	}
+	interactiveMode = true
+	ui := makeWebInterface(p, o)
+	for n, c := range pprofCommands {
+		ui.help[n] = c.description
+	}
+	for n, v := range pprofVariables {
+		ui.help[n] = v.help
+	}
+	ui.help["details"] = "Show information about the profile and this view"
+	ui.help["graph"] = "Display profile as a directed graph"
+	ui.help["reset"] = "Show the entire profile"
 
+	server := o.HTTPServer
+	if server == nil {
+		server = defaultWebServer
+	}
+	args := &plugin.HTTPServerArgs{
+		Hostport: net.JoinHostPort(host, strconv.Itoa(port)),
+		Host:     host,
+		Port:     port,
+		Handlers: map[string]http.Handler{
+			"/":           http.HandlerFunc(ui.dot),
+			"/top":        http.HandlerFunc(ui.top),
+			"/disasm":     http.HandlerFunc(ui.disasm),
+			"/source":     http.HandlerFunc(ui.source),
+			"/peek":       http.HandlerFunc(ui.peek),
+			"/flamegraph": http.HandlerFunc(ui.flamegraph),
+		},
+	}
+
+	if wantBrowser {
+		go openBrowser("http://"+args.Hostport, o)
+	}
+	return server(args)
 }
 
 // PProf acquires a profile, and symbolizes it using a profile
