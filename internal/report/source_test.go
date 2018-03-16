@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/pprof/internal/binutils"
-	"github.com/google/pprof/profile"
+	"pproflame/internal/binutils"
+	"pproflame/profile"
 )
 
 func TestWebList(t *testing.T) {

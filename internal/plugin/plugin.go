@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/google/pprof/profile"
+	"pproflame/profile"
 )
 
 // Options groups all the optional plugins into pprof.

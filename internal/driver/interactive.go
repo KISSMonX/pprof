@@ -22,9 +22,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/pprof/internal/plugin"
-	"github.com/google/pprof/internal/report"
-	"github.com/google/pprof/profile"
+	"pproflame/internal/plugin"
+	"pproflame/internal/report"
+	"pproflame/profile"
 )
 
 var commentStart = "//:" // Sentinel for comments on options

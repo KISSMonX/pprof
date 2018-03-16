@@ -27,10 +27,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/pprof/internal/graph"
-	"github.com/google/pprof/internal/plugin"
-	"github.com/google/pprof/internal/report"
-	"github.com/google/pprof/profile"
+	"pproflame/internal/graph"
+	"pproflame/internal/plugin"
+	"pproflame/internal/report"
+	"pproflame/profile"
 )
 
 // webInterface holds the state needed for serving a browser based interface.

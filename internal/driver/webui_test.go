@@ -27,8 +27,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/pprof/internal/plugin"
-	"github.com/google/pprof/profile"
+	"pproflame/internal/plugin"
+	"pproflame/profile"
 )
 
 func TestWebInterface(t *testing.T) {

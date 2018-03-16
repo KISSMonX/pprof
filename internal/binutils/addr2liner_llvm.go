@@ -23,7 +23,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/pprof/internal/plugin"
+	"pproflame/internal/plugin"
 )
 
 const (

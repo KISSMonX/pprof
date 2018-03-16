@@ -20,25 +20,62 @@ package driver
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
-	"github.com/google/pprof/internal/plugin"
-	"github.com/google/pprof/internal/report"
-	"github.com/google/pprof/profile"
+	"pproflame/internal/plugin"
+	"pproflame/internal/report"
+	"pproflame/profile"
 )
+
+// SetDefaults 默认配置
+func SetDefaults(option *plugin.Options) *plugin.Options {
+	if option == nil {
+		log.Panicln("输入的配置为空")
+		return option
+	}
+	return setDefaults(option)
+}
+
+// FetchSrcProfiles 拉取指定源的 pprof 数据
+func FetchSrcProfiles(option *plugin.Options, source string, httpHostPort string) (*profile.Profile, error) {
+	src, cmd, err := parseFlags(option)
+	if err != nil {
+		return nil, err
+	}
+
+	// NOTE: 暂不处理 cmd 命令
+	cmd = cmd
+
+	src.HTTPHostport = httpHostPort
+	src.Sources = []string{source}
+
+	p, err := fetchProfiles(src, option)
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
+
+// RenderFetchedProfiles 渲染拉取的 pprof 数据到页面
+func RenderFetchedProfiles(p *profile.Profile, o *plugin.Options, wantBrowser bool) error {
+
+}
 
 // PProf acquires a profile, and symbolizes it using a profile
 // manager. Then it generates a report formatted according to the
 // options selected through the flags package.
-func PProf(eo *plugin.Options) error {
+func PProf(eo *plugin.Options, source string, httpHostPort string) error {
 	// Remove any temporary files created during pprof processing.
 	defer cleanupTempFiles()
 
 	o := setDefaults(eo)
 
+	// TODO: 各个参数要搞明白, 尽量提供原先的参数不改动, 这样方便后期扩展
 	src, cmd, err := parseFlags(o)
 	if err != nil {
 		return err

@@ -20,16 +20,18 @@ import (
 	"regexp"
 	"time"
 
-	internaldriver "github.com/google/pprof/internal/driver"
-	"github.com/google/pprof/internal/plugin"
-	"github.com/google/pprof/profile"
+	internaldriver "pproflame/internal/driver"
+
+	"pproflame/internal/plugin"
+
+	"pproflame/profile"
 )
 
 // PProf acquires a profile, and symbolizes it using a profile
 // manager. Then it generates a report formatted according to the
 // options selected through the flags package.
-func PProf(o *Options) error {
-	return internaldriver.PProf(o.internalOptions())
+func PProf(o *Options, source string, httpHostPort string) error {
+	return internaldriver.PProf(o.internalOptions(), source, httpHostPort)
 }
 
 func (o *Options) internalOptions() *plugin.Options {

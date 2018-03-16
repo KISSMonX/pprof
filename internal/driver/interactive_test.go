@@ -20,10 +20,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/pprof/internal/plugin"
-	"github.com/google/pprof/internal/proftest"
-	"github.com/google/pprof/internal/report"
-	"github.com/google/pprof/profile"
+	"pproflame/internal/plugin"
+	"pproflame/internal/proftest"
+	"pproflame/internal/report"
+	"pproflame/profile"
 )
 
 func TestShell(t *testing.T) {

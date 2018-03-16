@@ -27,9 +27,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/pprof/internal/graph"
-	"github.com/google/pprof/internal/measurement"
-	"github.com/google/pprof/internal/plugin"
+	"pproflame/internal/graph"
+	"pproflame/internal/measurement"
+	"pproflame/internal/plugin"
 )
 
 // printSource prints an annotated source listing, include all

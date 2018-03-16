@@ -19,8 +19,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/pprof/internal/binutils"
-	"github.com/google/pprof/internal/plugin"
+	"pproflame/internal/binutils"
+	"pproflame/internal/plugin"
 )
 
 type source struct {
