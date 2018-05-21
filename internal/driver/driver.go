@@ -109,7 +109,7 @@ func RenderFetchedProfiles(p *profile.Profile, o *plugin.Options, wantBrowser bo
 // PProf acquires a profile, and symbolizes it using a profile
 // manager. Then it generates a report formatted according to the
 // options selected through the flags package.
-func PProf(eo *plugin.Options, source string, httpHostPort string) error {
+func PProf(eo *plugin.Options, source, timeout string, httpHostPort string) error {
 	// Remove any temporary files created during pprof processing.
 	defer cleanupTempFiles()
 

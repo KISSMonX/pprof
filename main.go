@@ -34,11 +34,18 @@ import (
 
 func getServicePprof(c *gin.Context) {
 	serviceName := c.Param("servicename") // 获取服务名称, 对应配置文件的 source(host, port)
+	timeout := c.Param("timeout")
 	if len(serviceName) == 0 {
 		log.Println("请指定需要采集的服务名称")
 		return
 	}
-	log.Panicln("查询服务: ", serviceName)
+	log.Println("查询服务: ", serviceName)
+
+	if timeout == "" {
+		timeout = "30" // 默认 30 秒
+	}
+
+	log.Println("采样时间: ", timeout)
 
 	source, err := config.GetServiceSource(serviceName)
 	if err != nil {
@@ -49,7 +56,7 @@ func getServicePprof(c *gin.Context) {
 	log.Println("请求源地址: ", c.ClientIP())
 	log.Println("服务: ", serviceName, "的 pprof 地址是: ", source)
 
-	driver.PProf(&driver.Options{}, source, config.GetHTTPServeHostPort())
+	driver.PProf(&driver.Options{}, source, timeout, config.GetHTTPServeHostPort())
 }
 
 func main() {

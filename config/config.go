@@ -39,7 +39,10 @@ func LoadConfig() error {
 		return err
 	}
 
-	log.Printf("配置信息: %+v", Config)
+	for _, item := range Config.Sources {
+		log.Printf("%s: %s:%s  isInner: %v Comment: %s", item.Name, item.Host, item.Port, item.IsInner, item.Comment)
+	}
+
 	return nil
 }
 
