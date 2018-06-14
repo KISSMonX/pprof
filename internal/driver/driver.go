@@ -131,7 +131,7 @@ func PProf(eo *plugin.Options, source, timeout string, httpHostPort string) erro
 	}
 
 	if src.HTTPHostport != "" {
-		return serveWebInterface(src.HTTPHostport, p, o, true)
+		return serveWebInterface(src.HTTPHostport, p, o)
 	}
 	return interactive(p, o)
 }
@@ -142,7 +142,13 @@ func generateRawReport(p *profile.Profile, cmd []string, vars variables, o *plug
 	// Identify units of numeric tags in profile.
 	numLabelUnits := identifyNumLabelUnits(p, o.UI)
 
-	vars = applyCommandOverrides(cmd, vars)
+	// Get report output format
+	c := pprofCommands[cmd[0]]
+	if c == nil {
+		panic("unexpected nil command")
+	}
+
+	vars = applyCommandOverrides(cmd[0], c.format, vars)
 
 	// Delay focus after configuring report to get percentages on all samples.
 	relative := vars["relative_percentages"].boolValue()
@@ -154,10 +160,6 @@ func generateRawReport(p *profile.Profile, cmd []string, vars variables, o *plug
 	ropt, err := reportOptions(p, numLabelUnits, vars)
 	if err != nil {
 		return nil, nil, err
-	}
-	c := pprofCommands[cmd[0]]
-	if c == nil {
-		panic("unexpected nil command")
 	}
 	ropt.OutputFormat = c.format
 	if len(cmd) == 2 {
@@ -226,13 +228,10 @@ func generateReport(p *profile.Profile, cmd []string, vars variables, o *plugin.
 	return out.Close()
 }
 
-func applyCommandOverrides(cmd []string, v variables) variables {
-	trim, focus, tagfocus, hide := v["trim"].boolValue(), true, true, true
+func applyCommandOverrides(cmd string, outputFormat int, v variables) variables {
+	trim, tagfilter, filter := v["trim"].boolValue(), true, true
 
-	switch cmd[0] {
-	case "proto", "raw":
-		trim, focus, tagfocus, hide = false, false, false, false
-		v.set("addresses", "t")
+	switch cmd {
 	case "callgrind", "kcachegrind":
 		trim = false
 		v.set("addresses", "t")
@@ -240,7 +239,7 @@ func applyCommandOverrides(cmd []string, v variables) variables {
 		trim = false
 		v.set("addressnoinlines", "t")
 	case "peek":
-		trim, focus, hide = false, false, false
+		trim, tagfilter, filter = false, false, false
 	case "list":
 		v.set("nodecount", "0")
 		v.set("lines", "t")
@@ -253,22 +252,27 @@ func applyCommandOverrides(cmd []string, v variables) variables {
 			v.set("nodecount", "80")
 		}
 	}
+
+	if outputFormat == report.Proto || outputFormat == report.Raw {
+		trim, tagfilter, filter = false, false, false
+		v.set("addresses", "t")
+	}
+
 	if !trim {
 		v.set("nodecount", "0")
 		v.set("nodefraction", "0")
 		v.set("edgefraction", "0")
 	}
-	if !focus {
-		v.set("focus", "")
-		v.set("ignore", "")
-	}
-	if !tagfocus {
+	if !tagfilter {
 		v.set("tagfocus", "")
 		v.set("tagignore", "")
 	}
-	if !hide {
+	if !filter {
+		v.set("focus", "")
+		v.set("ignore", "")
 		v.set("hide", "")
 		v.set("show", "")
+		v.set("show_from", "")
 	}
 	return v
 }
@@ -319,7 +323,7 @@ func reportOptions(p *profile.Profile, numLabelUnits map[string]string, vars var
 	}
 
 	var filters []string
-	for _, k := range []string{"focus", "ignore", "hide", "show", "tagfocus", "tagignore", "tagshow", "taghide"} {
+	for _, k := range []string{"focus", "ignore", "hide", "show", "show_from", "tagfocus", "tagignore", "tagshow", "taghide"} {
 		v := vars[k].value
 		if v != "" {
 			filters = append(filters, k+"="+v)
@@ -327,10 +331,9 @@ func reportOptions(p *profile.Profile, numLabelUnits map[string]string, vars var
 	}
 
 	ropt := &report.Options{
-		CumSort:             vars["cum"].boolValue(),
-		CallTree:            vars["call_tree"].boolValue(),
-		DropNegative:        vars["drop_negative"].boolValue(),
-		PositivePercentages: vars["positive_percentages"].boolValue(),
+		CumSort:      vars["cum"].boolValue(),
+		CallTree:     vars["call_tree"].boolValue(),
+		DropNegative: vars["drop_negative"].boolValue(),
 
 		CompactLabels: vars["compact_labels"].boolValue(),
 		Ratio:         1 / vars["divide_by"].floatValue(),
@@ -350,6 +353,7 @@ func reportOptions(p *profile.Profile, numLabelUnits map[string]string, vars var
 		OutputUnit: vars["unit"].value,
 
 		SourcePath: vars["source_path"].stringValue(),
+		TrimPath:   vars["trim_path"].stringValue(),
 	}
 
 	if len(p.Mapping) > 0 && p.Mapping[0].File != "" {
