@@ -25,7 +25,51 @@ import (
 	"pproflame/internal/plugin"
 
 	"pproflame/profile"
+
+	"github.com/gin-gonic/gin"
 )
+
+// SMMPProf acquires a profile, and symbolizes it using a profile
+// manager. Then it generates a report formatted according to the
+// options selected through the flags package.
+func SMMPProf(o *Options, source string, seconds int) (*internaldriver.WebInterface, error) {
+	return internaldriver.SMMPProf(o.internalOptions(), source, seconds)
+}
+
+// SMMPProfRoot dot
+func SMMPProfRoot(ui *internaldriver.WebInterface, c *gin.Context) {
+	ui.Dot(c)
+}
+
+// SMMPProfTop top
+func SMMPProfTop(ui *internaldriver.WebInterface, c *gin.Context) {
+	ui.Top(c)
+}
+
+// SMMPProfDisasm disasm
+func SMMPProfDisasm(ui *internaldriver.WebInterface, c *gin.Context) {
+	ui.Disasm(c)
+}
+
+// SMMPProfSource Source
+func SMMPProfSource(ui *internaldriver.WebInterface, c *gin.Context) {
+	ui.Source(c)
+}
+
+// SMMPProfPeek Peek
+func SMMPProfPeek(ui *internaldriver.WebInterface, c *gin.Context) {
+	ui.Peek(c)
+}
+
+// SMMPProfFlamegraph Flamegraph
+func SMMPProfFlamegraph(ui *internaldriver.WebInterface, c *gin.Context) {
+	ui.Flamegraph(c)
+}
+
+// SMMCleanTempFiles 清临时文件
+func SMMCleanTempFiles() {
+	internaldriver.SMMCleanupTempFiles()
+}
 
 // PProf acquires a profile, and symbolizes it using a profile
 // manager. Then it generates a report formatted according to the

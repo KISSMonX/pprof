@@ -52,3 +52,13 @@ func cleanupTempFiles() {
 	tempFiles = nil
 	tempFilesMu.Unlock()
 }
+
+// SMMCleanupTempFiles removes any temporary files selected for deferred cleaning.
+func SMMCleanupTempFiles() {
+	tempFilesMu.Lock()
+	for _, f := range tempFiles {
+		os.Remove(f)
+	}
+	tempFiles = nil
+	tempFilesMu.Unlock()
+}

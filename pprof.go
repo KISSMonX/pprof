@@ -25,7 +25,7 @@ import (
 	"github.com/google/pprof/driver"
 )
 
-func main() {
+func main_temp() {
 	if err := driver.PProf(&driver.Options{UI: newUI()}); err != nil {
 		fmt.Fprintf(os.Stderr, "pprof: %v\n", err)
 		os.Exit(2)

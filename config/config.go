@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"log"
+	"path/filepath"
 )
 
 // sourceConf 各服务 pprof 接口配置
@@ -28,7 +29,8 @@ var (
 
 // LoadConfig 读取各服务路径 url 配置信息
 func LoadConfig() error {
-	f, err := ioutil.ReadFile("sources.conf")
+	absPath, _ := filepath.Abs("sources.cfg")
+	f, err := ioutil.ReadFile(absPath)
 	if err != nil {
 		log.Panicln("读取配置文件失败: ", err)
 		return err
@@ -40,7 +42,7 @@ func LoadConfig() error {
 	}
 
 	for _, item := range Config.Sources {
-		log.Printf("%s: %s:%s  isInner: %v Comment: %s", item.Name, item.Host, item.Port, item.IsInner, item.Comment)
+		log.Printf("%-16s: %-22s 内网接口: %-5v 备注: %s", item.Name, item.Host+":"+item.Port, item.IsInner, item.Comment)
 	}
 
 	return nil
@@ -53,14 +55,22 @@ func GetServiceSource(serviceName string) (source string, err error) {
 		return "", errors.New("没有指定服务名称")
 	}
 
+	var host, port string
 	for k, v := range Config.Sources {
 		log.Println(k, v)
 		if v.Name == serviceName {
-			source = v.Host + ":" + v.Port
+			host = v.Host
+			port = v.Port
 			break
 		}
 	}
 
+	if host == "" || port == "" {
+		log.Println("服务地址或端口不存在, 可能没有注册: ", host, port)
+		return "", errors.New("服务可能没有注册")
+	}
+
+	source = host + ":" + port
 	return source, err
 }
 

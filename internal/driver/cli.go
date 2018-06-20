@@ -39,10 +39,8 @@ type source struct {
 	Comment      string
 }
 
-// Parse parses the command lines through the specified flags package
-// and returns the source of the profile and optionally the command
-// for the kind of report to generate (nil for interactive use).
-func parseFlags(o *plugin.Options) (*source, []string, error) {
+// smmParseFlags 通过 http param 的方式来获取参数, 并改变默认值
+func smmParseFlags(o *plugin.Options) (*source, []string, error) {
 	flag := o.Flagset
 	// Comparisons.
 	flagBase := flag.StringList("base", "", "Source for base profile for profile subtraction")
@@ -53,7 +51,7 @@ func parseFlags(o *plugin.Options) (*source, []string, error) {
 	flagTimeout := flag.Int("timeout", -1, "Timeout in seconds for fetching a profile")
 	flagAddComment := flag.String("add_comment", "", "Annotation string to record in the profile")
 	// CPU profile options
-	flagSeconds := flag.Int("seconds", -1, "Length of time for dynamic profiles")
+	flagSeconds := flag.Int("seconds", 30, "Length of time for dynamic profiles")
 	// Heap profile options
 	flagInUseSpace := flag.Bool("inuse_space", false, "Display in-use memory size")
 	flagInUseObjects := flag.Bool("inuse_objects", false, "Display in-use object counts")
@@ -72,7 +70,7 @@ func parseFlags(o *plugin.Options) (*source, []string, error) {
 
 	flagCommands := make(map[string]*bool)
 	flagParamCommands := make(map[string]*string)
-	for name, cmd := range pprofCommands {
+	for name, cmd := range PProfCommands {
 		if cmd.hasParam {
 			flagParamCommands[name] = flag.String(name, "", "Generate a report in "+name+" format, matching regexp")
 		} else {
@@ -118,7 +116,7 @@ func parseFlags(o *plugin.Options) (*source, []string, error) {
 		return nil, nil, errors.New("-http is not compatible with an output format on the command line")
 	}
 
-	si := pprofVariables["sample_index"].value
+	si := PProfVariables["sample_index"].value
 	si = sampleIndex(flagTotalDelay, si, "delay", "-total_delay", o.UI)
 	si = sampleIndex(flagMeanDelay, si, "delay", "-mean_delay", o.UI)
 	si = sampleIndex(flagContentions, si, "contentions", "-contentions", o.UI)
@@ -126,10 +124,10 @@ func parseFlags(o *plugin.Options) (*source, []string, error) {
 	si = sampleIndex(flagInUseObjects, si, "inuse_objects", "-inuse_objects", o.UI)
 	si = sampleIndex(flagAllocSpace, si, "alloc_space", "-alloc_space", o.UI)
 	si = sampleIndex(flagAllocObjects, si, "alloc_objects", "-alloc_objects", o.UI)
-	pprofVariables.set("sample_index", si)
+	PProfVariables.set("sample_index", si)
 
 	if *flagMeanDelay {
-		pprofVariables.set("mean", "true")
+		PProfVariables.set("mean", "true")
 	}
 
 	source := &source{
@@ -147,7 +145,127 @@ func parseFlags(o *plugin.Options) (*source, []string, error) {
 		return nil, nil, err
 	}
 
-	normalize := pprofVariables["normalize"].boolValue()
+	normalize := PProfVariables["normalize"].boolValue()
+	if normalize && len(source.Base) == 0 {
+		return nil, nil, errors.New("must have base profile to normalize by")
+	}
+	source.Normalize = normalize
+
+	if bu, ok := o.Obj.(*binutils.Binutils); ok {
+		bu.SetTools(*flagTools)
+	}
+	return source, cmd, nil
+}
+
+// Parse parses the command lines through the specified flags package
+// and returns the source of the profile and optionally the command
+// for the kind of report to generate (nil for interactive use).
+func parseFlags(o *plugin.Options) (*source, []string, error) {
+	flag := o.Flagset
+	// Comparisons.
+	flagBase := flag.StringList("base", "", "Source for base profile for profile subtraction")
+	flagDiffBase := flag.StringList("diff_base", "", "Source for diff base profile for comparison")
+	// Source options.
+	flagSymbolize := flag.String("symbolize", "", "Options for profile symbolization")
+	flagBuildID := flag.String("buildid", "", "Override build id for first mapping")
+	flagTimeout := flag.Int("timeout", -1, "Timeout in seconds for fetching a profile")
+	flagAddComment := flag.String("add_comment", "", "Annotation string to record in the profile")
+	// CPU profile options
+	flagSeconds := flag.Int("seconds", -1, "Length of time for dynamic profiles")
+	// Heap profile options
+	flagInUseSpace := flag.Bool("inuse_space", false, "Display in-use memory size")
+	flagInUseObjects := flag.Bool("inuse_objects", false, "Display in-use object counts")
+	flagAllocSpace := flag.Bool("alloc_space", false, "Display allocated memory size")
+	flagAllocObjects := flag.Bool("alloc_objects", false, "Display allocated object counts")
+	// Contention profile options
+	flagTotalDelay := flag.Bool("total_delay", false, "Display total delay at each region")
+	flagContentions := flag.Bool("contentions", false, "Display number of delays at each region")
+	flagMeanDelay := flag.Bool("mean_delay", false, "Display mean delay at each region")
+	flagTools := flag.String("tools", os.Getenv("PPROF_TOOLS"), "Path for object tool pathnames")
+
+	flagHTTP := flag.String("http", "", "Present interactive web based UI at the specified http host:port")
+
+	// Flags used during command processing
+	installedFlags := installFlags(flag)
+
+	flagCommands := make(map[string]*bool)
+	flagParamCommands := make(map[string]*string)
+	for name, cmd := range PProfCommands {
+		if cmd.hasParam {
+			flagParamCommands[name] = flag.String(name, "", "Generate a report in "+name+" format, matching regexp")
+		} else {
+			flagCommands[name] = flag.Bool(name, false, "Generate a report in "+name+" format")
+		}
+	}
+
+	args := flag.Parse(func() {
+		o.UI.Print(usageMsgHdr +
+			usage(true) +
+			usageMsgSrc +
+			flag.ExtraUsage() +
+			usageMsgVars)
+	})
+	if len(args) == 0 {
+		return nil, nil, errors.New("no profile source specified")
+	}
+
+	var execName string
+	// Recognize first argument as an executable or buildid override.
+	if len(args) > 1 {
+		arg0 := args[0]
+		if file, err := o.Obj.Open(arg0, 0, ^uint64(0), 0); err == nil {
+			file.Close()
+			execName = arg0
+			args = args[1:]
+		} else if *flagBuildID == "" && isBuildID(arg0) {
+			*flagBuildID = arg0
+			args = args[1:]
+		}
+	}
+
+	// Report conflicting options
+	if err := updateFlags(installedFlags); err != nil {
+		return nil, nil, err
+	}
+
+	cmd, err := outputFormat(flagCommands, flagParamCommands)
+	if err != nil {
+		return nil, nil, err
+	}
+	if cmd != nil && *flagHTTP != "" {
+		return nil, nil, errors.New("-http is not compatible with an output format on the command line")
+	}
+
+	si := PProfVariables["sample_index"].value
+	si = sampleIndex(flagTotalDelay, si, "delay", "-total_delay", o.UI)
+	si = sampleIndex(flagMeanDelay, si, "delay", "-mean_delay", o.UI)
+	si = sampleIndex(flagContentions, si, "contentions", "-contentions", o.UI)
+	si = sampleIndex(flagInUseSpace, si, "inuse_space", "-inuse_space", o.UI)
+	si = sampleIndex(flagInUseObjects, si, "inuse_objects", "-inuse_objects", o.UI)
+	si = sampleIndex(flagAllocSpace, si, "alloc_space", "-alloc_space", o.UI)
+	si = sampleIndex(flagAllocObjects, si, "alloc_objects", "-alloc_objects", o.UI)
+	PProfVariables.set("sample_index", si)
+
+	if *flagMeanDelay {
+		PProfVariables.set("mean", "true")
+	}
+
+	source := &source{
+		Sources:      args,
+		ExecName:     execName,
+		BuildID:      *flagBuildID,
+		Seconds:      *flagSeconds,
+		Timeout:      *flagTimeout,
+		Symbolize:    *flagSymbolize,
+		HTTPHostport: *flagHTTP,
+		Comment:      *flagAddComment,
+	}
+
+	if err := source.addBaseProfiles(*flagBase, *flagDiffBase); err != nil {
+		return nil, nil, err
+	}
+
+	normalize := PProfVariables["normalize"].boolValue()
 	if normalize && len(source.Base) == 0 {
 		return nil, nil, errors.New("must have base profile to normalize by")
 	}
@@ -195,7 +313,7 @@ func installFlags(flag plugin.FlagSet) flagsInstalled {
 		floats:  make(map[string]*float64),
 		strings: make(map[string]*string),
 	}
-	for n, v := range pprofVariables {
+	for n, v := range PProfVariables {
 		switch v.kind {
 		case boolKind:
 			if v.group != "" {
@@ -218,7 +336,7 @@ func installFlags(flag plugin.FlagSet) flagsInstalled {
 // updateFlags updates the pprof variables according to the flags
 // parsed in the command line.
 func updateFlags(f flagsInstalled) error {
-	vars := pprofVariables
+	vars := PProfVariables
 	groups := map[string]string{}
 	for n, v := range f.bools {
 		vars.set(n, fmt.Sprint(*v))

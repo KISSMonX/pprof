@@ -31,21 +31,24 @@ import (
 	"pproflame/internal/plugin"
 	"pproflame/internal/report"
 	"pproflame/profile"
+
+	"github.com/gin-gonic/gin"
 )
 
-// webInterface holds the state needed for serving a browser based interface.
-type webInterface struct {
+// WebInterface holds the state needed for serving a browser based interface.
+type WebInterface struct {
 	prof      *profile.Profile
 	options   *plugin.Options
 	help      map[string]string
 	templates *template.Template
 }
 
-func makeWebInterface(p *profile.Profile, opt *plugin.Options) *webInterface {
+// MakeWebInterface 获取 Web UI 对象
+func MakeWebInterface(p *profile.Profile, opt *plugin.Options) *WebInterface {
 	templates := template.New("templategroup")
 	addTemplates(templates)
 	report.AddSourceTemplates(templates)
-	return &webInterface{
+	return &WebInterface{
 		prof:      p,
 		options:   opt,
 		help:      make(map[string]string),
@@ -87,11 +90,11 @@ func serveWebInterface(hostport string, p *profile.Profile, o *plugin.Options) e
 		return err
 	}
 	interactiveMode = true
-	ui := makeWebInterface(p, o)
-	for n, c := range pprofCommands {
+	ui := MakeWebInterface(p, o)
+	for n, c := range PProfCommands {
 		ui.help[n] = c.description
 	}
-	for n, v := range pprofVariables {
+	for n, v := range PProfVariables {
 		ui.help[n] = v.help
 	}
 	ui.help["details"] = "Show information about the profile and this view"
@@ -107,12 +110,12 @@ func serveWebInterface(hostport string, p *profile.Profile, o *plugin.Options) e
 		Host:     host,
 		Port:     port,
 		Handlers: map[string]http.Handler{
-			"/":           http.HandlerFunc(ui.dot),
-			"/top":        http.HandlerFunc(ui.top),
-			"/disasm":     http.HandlerFunc(ui.disasm),
-			"/source":     http.HandlerFunc(ui.source),
-			"/peek":       http.HandlerFunc(ui.peek),
-			"/flamegraph": http.HandlerFunc(ui.flamegraph),
+		// "/":           http.HandlerFunc(ui.Dot),
+		// "/top":        http.HandlerFunc(ui.Top),
+		// "/disasm":     http.HandlerFunc(ui.Disasm),
+		// "/source":     http.HandlerFunc(ui.Source),
+		// "/peek":       http.HandlerFunc(ui.Peek),
+		// "/flamegraph": http.HandlerFunc(ui.Flamegraph),
 		},
 	}
 
@@ -202,7 +205,7 @@ func openBrowser(url string, o *plugin.Options) {
 		{"i", "ignore"},
 		{"h", "hide"},
 	} {
-		if v := pprofVariables[p.key].value; v != "" {
+		if v := PProfVariables[p.key].value; v != "" {
 			q.Set(p.param, v)
 		}
 	}
@@ -227,7 +230,7 @@ func openBrowser(url string, o *plugin.Options) {
 }
 
 func varsFromURL(u *gourl.URL) variables {
-	vars := pprofVariables.makeCopy()
+	vars := PProfVariables.makeCopy()
 	vars["focus"].value = u.Query().Get("f")
 	vars["show"].value = u.Query().Get("s")
 	vars["ignore"].value = u.Query().Get("i")
@@ -236,9 +239,9 @@ func varsFromURL(u *gourl.URL) variables {
 }
 
 // makeReport generates a report for the specified command.
-func (ui *webInterface) makeReport(w http.ResponseWriter, req *http.Request,
+func (ui *WebInterface) makeReport(c *gin.Context,
 	cmd []string, vars ...string) (*report.Report, []string) {
-	v := varsFromURL(req.URL)
+	v := varsFromURL(c.Request.URL)
 	for i := 0; i+1 < len(vars); i += 2 {
 		v[vars[i]].value = vars[i+1]
 	}
@@ -247,7 +250,7 @@ func (ui *webInterface) makeReport(w http.ResponseWriter, req *http.Request,
 	options.UI = catcher
 	_, rpt, err := generateRawReport(ui.prof, cmd, v, &options)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		c.String(http.StatusBadRequest, err.Error())
 		ui.options.UI.PrintErr(err)
 		return nil, nil
 	}
@@ -255,7 +258,7 @@ func (ui *webInterface) makeReport(w http.ResponseWriter, req *http.Request,
 }
 
 // render generates html using the named template based on the contents of data.
-func (ui *webInterface) render(w http.ResponseWriter, tmpl string,
+func (ui *WebInterface) render(c *gin.Context, tmpl string,
 	rpt *report.Report, errList, legend []string, data webArgs) {
 	file := getFromLegend(legend, "File: ", "unknown")
 	profile := getFromLegend(legend, "Type: ", "unknown")
@@ -266,17 +269,17 @@ func (ui *webInterface) render(w http.ResponseWriter, tmpl string,
 	data.Help = ui.help
 	html := &bytes.Buffer{}
 	if err := ui.templates.ExecuteTemplate(html, tmpl, data); err != nil {
-		http.Error(w, "internal template error", http.StatusInternalServerError)
+		c.String(http.StatusInternalServerError, "internal template error")
 		ui.options.UI.PrintErr(err)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html")
-	w.Write(html.Bytes())
+	c.Header("Content-Type", "text/html")
+	c.Writer.Write(html.Bytes())
 }
 
-// dot generates a web page containing an svg diagram.
-func (ui *webInterface) dot(w http.ResponseWriter, req *http.Request) {
-	rpt, errList := ui.makeReport(w, req, []string{"svg"})
+// Dot generates a web page containing an svg diagram.
+func (ui *WebInterface) Dot(c *gin.Context) {
+	rpt, errList := ui.makeReport(c, []string{"svg"})
 	if rpt == nil {
 		return // error already reported
 	}
@@ -291,8 +294,7 @@ func (ui *webInterface) dot(w http.ResponseWriter, req *http.Request) {
 	// Convert to svg.
 	svg, err := dotToSvg(dot.Bytes())
 	if err != nil {
-		http.Error(w, "Could not execute dot; may need to install graphviz.",
-			http.StatusNotImplemented)
+		c.String(http.StatusNotImplemented, "Could not execute dot; may need to install graphviz.")
 		ui.options.UI.PrintErr("Failed to execute dot. Is Graphviz installed?\n", err)
 		return
 	}
@@ -303,7 +305,7 @@ func (ui *webInterface) dot(w http.ResponseWriter, req *http.Request) {
 		nodes = append(nodes, n.Info.Name)
 	}
 
-	ui.render(w, "graph", rpt, errList, legend, webArgs{
+	ui.render(c, "graph", rpt, errList, legend, webArgs{
 		HTMLBody: template.HTML(string(svg)),
 		Nodes:    nodes,
 	})
@@ -327,8 +329,9 @@ func dotToSvg(dot []byte) ([]byte, error) {
 	return svg, nil
 }
 
-func (ui *webInterface) top(w http.ResponseWriter, req *http.Request) {
-	rpt, errList := ui.makeReport(w, req, []string{"top"}, "nodecount", "500")
+// Top  top
+func (ui *WebInterface) Top(c *gin.Context) {
+	rpt, errList := ui.makeReport(c, []string{"top"}, "nodecount", "500")
 	if rpt == nil {
 		return // error already reported
 	}
@@ -338,39 +341,39 @@ func (ui *webInterface) top(w http.ResponseWriter, req *http.Request) {
 		nodes = append(nodes, item.Name)
 	}
 
-	ui.render(w, "top", rpt, errList, legend, webArgs{
+	ui.render(c, "top", rpt, errList, legend, webArgs{
 		Top:   top,
 		Nodes: nodes,
 	})
 }
 
-// disasm generates a web page containing disassembly.
-func (ui *webInterface) disasm(w http.ResponseWriter, req *http.Request) {
-	args := []string{"disasm", req.URL.Query().Get("f")}
-	rpt, errList := ui.makeReport(w, req, args)
+// Disasm generates a web page containing disassembly.
+func (ui *WebInterface) Disasm(c *gin.Context) {
+	args := []string{"disasm", c.Request.URL.Query().Get("f")}
+	rpt, errList := ui.makeReport(c, args)
 	if rpt == nil {
 		return // error already reported
 	}
 
 	out := &bytes.Buffer{}
 	if err := report.PrintAssembly(out, rpt, ui.options.Obj, maxEntries); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		c.String(http.StatusBadRequest, err.Error())
 		ui.options.UI.PrintErr(err)
 		return
 	}
 
 	legend := report.ProfileLabels(rpt)
-	ui.render(w, "plaintext", rpt, errList, legend, webArgs{
+	ui.render(c, "plaintext", rpt, errList, legend, webArgs{
 		TextBody: out.String(),
 	})
 
 }
 
-// source generates a web page containing source code annotated with profile
+// Source generates a web page containing source code annotated with profile
 // data.
-func (ui *webInterface) source(w http.ResponseWriter, req *http.Request) {
-	args := []string{"weblist", req.URL.Query().Get("f")}
-	rpt, errList := ui.makeReport(w, req, args)
+func (ui *WebInterface) Source(c *gin.Context) {
+	args := []string{"weblist", c.Request.URL.Query().Get("f")}
+	rpt, errList := ui.makeReport(c, args)
 	if rpt == nil {
 		return // error already reported
 	}
@@ -378,34 +381,34 @@ func (ui *webInterface) source(w http.ResponseWriter, req *http.Request) {
 	// Generate source listing.
 	var body bytes.Buffer
 	if err := report.PrintWebList(&body, rpt, ui.options.Obj, maxEntries); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		c.String(http.StatusBadRequest, err.Error())
 		ui.options.UI.PrintErr(err)
 		return
 	}
 
 	legend := report.ProfileLabels(rpt)
-	ui.render(w, "sourcelisting", rpt, errList, legend, webArgs{
+	ui.render(c, "sourcelisting", rpt, errList, legend, webArgs{
 		HTMLBody: template.HTML(body.String()),
 	})
 }
 
-// peek generates a web page listing callers/callers.
-func (ui *webInterface) peek(w http.ResponseWriter, req *http.Request) {
-	args := []string{"peek", req.URL.Query().Get("f")}
-	rpt, errList := ui.makeReport(w, req, args, "lines", "t")
+// Peek generates a web page listing callers/callers.
+func (ui *WebInterface) Peek(c *gin.Context) {
+	args := []string{"peek", c.Request.URL.Query().Get("f")}
+	rpt, errList := ui.makeReport(c, args, "lines", "t")
 	if rpt == nil {
 		return // error already reported
 	}
 
 	out := &bytes.Buffer{}
 	if err := report.Generate(out, rpt, ui.options.Obj); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		c.String(http.StatusBadRequest, err.Error())
 		ui.options.UI.PrintErr(err)
 		return
 	}
 
 	legend := report.ProfileLabels(rpt)
-	ui.render(w, "plaintext", rpt, errList, legend, webArgs{
+	ui.render(c, "plaintext", rpt, errList, legend, webArgs{
 		TextBody: out.String(),
 	})
 }

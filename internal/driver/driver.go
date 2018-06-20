@@ -21,89 +21,51 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"net"
-	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
-
 	"pproflame/internal/plugin"
 	"pproflame/internal/report"
 	"pproflame/profile"
+	"regexp"
+	"strings"
 )
 
-// SetDefaults 默认配置
-func SetDefaults(option *plugin.Options) *plugin.Options {
-	if option == nil {
-		log.Panicln("输入的配置为空")
-		return option
-	}
-	return setDefaults(option)
-}
+// SMMPProf 通过配置的参数项, 采集
+func SMMPProf(eo *plugin.Options, source string, seconds int) (*WebInterface, error) {
+	// Remove any temporary files created during pprof processing.
+	// defer cleanupTempFiles() // FIXME: 删除临时文件?
 
-// FetchSrcProfiles 拉取指定源的 pprof 数据
-func FetchSrcProfiles(option *plugin.Options, source string, httpHostPort string) (*profile.Profile, error) {
-	src, cmd, err := parseFlags(option)
+	o := setDefaults(eo)
+
+	src, cmd, err := smmParseFlags(o)
 	if err != nil {
 		return nil, err
 	}
 
-	// NOTE: 暂不处理 cmd 命令
-	cmd = cmd
-
-	src.HTTPHostport = httpHostPort
+	// 设置采样目标地址以及参数
 	src.Sources = []string{source}
+	src.Seconds = seconds
 
-	p, err := fetchProfiles(src, option)
+	p, err := fetchProfiles(src, o)
 	if err != nil {
+		log.Println("采集服务信息失败: ", source, seconds, src)
 		return nil, err
 	}
 
-	return p, nil
-}
+	log.Printf("解析后的 src: %+v\n cmd: %+v\n", src, cmd)
 
-// RenderFetchedProfiles 渲染拉取的 pprof 数据到页面
-func RenderFetchedProfiles(p *profile.Profile, o *plugin.Options, wantBrowser bool) error {
-	host, port, err := getHostAndPort(hostport)
-	if err != nil {
-		return err
-	}
-	interactiveMode = true
-	ui := makeWebInterface(p, o)
-	for n, c := range pprofCommands {
+	ui := MakeWebInterface(p, o)
+	for n, c := range PProfCommands {
 		ui.help[n] = c.description
 	}
-	for n, v := range pprofVariables {
+	for n, v := range PProfVariables {
 		ui.help[n] = v.help
 	}
 	ui.help["details"] = "Show information about the profile and this view"
 	ui.help["graph"] = "Display profile as a directed graph"
 	ui.help["reset"] = "Show the entire profile"
 
-	server := o.HTTPServer
-	if server == nil {
-		server = defaultWebServer
-	}
-	args := &plugin.HTTPServerArgs{
-		Hostport: net.JoinHostPort(host, strconv.Itoa(port)),
-		Host:     host,
-		Port:     port,
-		Handlers: map[string]http.Handler{
-			"/":           http.HandlerFunc(ui.dot),
-			"/top":        http.HandlerFunc(ui.top),
-			"/disasm":     http.HandlerFunc(ui.disasm),
-			"/source":     http.HandlerFunc(ui.source),
-			"/peek":       http.HandlerFunc(ui.peek),
-			"/flamegraph": http.HandlerFunc(ui.flamegraph),
-		},
-	}
-
-	if wantBrowser {
-		go openBrowser("http://"+args.Hostport, o)
-	}
-	return server(args)
+	return ui, nil
 }
 
 // PProf acquires a profile, and symbolizes it using a profile
@@ -115,7 +77,6 @@ func PProf(eo *plugin.Options, source, timeout string, httpHostPort string) erro
 
 	o := setDefaults(eo)
 
-	// TODO: 各个参数要搞明白, 尽量提供原先的参数不改动, 这样方便后期扩展
 	src, cmd, err := parseFlags(o)
 	if err != nil {
 		return err
@@ -127,7 +88,7 @@ func PProf(eo *plugin.Options, source, timeout string, httpHostPort string) erro
 	}
 
 	if cmd != nil {
-		return generateReport(p, cmd, pprofVariables, o)
+		return generateReport(p, cmd, PProfVariables, o)
 	}
 
 	if src.HTTPHostport != "" {
@@ -143,7 +104,7 @@ func generateRawReport(p *profile.Profile, cmd []string, vars variables, o *plug
 	numLabelUnits := identifyNumLabelUnits(p, o.UI)
 
 	// Get report output format
-	c := pprofCommands[cmd[0]]
+	c := PProfCommands[cmd[0]]
 	if c == nil {
 		panic("unexpected nil command")
 	}

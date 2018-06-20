@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gin-gonic/gin"
+
 	"pproflame/internal/graph"
 	"pproflame/internal/measurement"
 	"pproflame/internal/report"
@@ -34,11 +36,11 @@ type treeNode struct {
 	Children  []*treeNode `json:"c"`
 }
 
-// flamegraph generates a web page containing a flamegraph.
-func (ui *webInterface) flamegraph(w http.ResponseWriter, req *http.Request) {
+// Flamegraph generates a web page containing a flamegraph.
+func (ui *WebInterface) Flamegraph(c *gin.Context) {
 	// Force the call tree so that the graph is a tree.
 	// Also do not trim the tree so that the flame graph contains all functions.
-	rpt, errList := ui.makeReport(w, req, []string{"svg"}, "call_tree", "true", "trim", "false")
+	rpt, errList := ui.makeReport(c, []string{"svg"}, "call_tree", "true", "trim", "false")
 	if rpt == nil {
 		return // error already reported
 	}
@@ -91,12 +93,12 @@ func (ui *webInterface) flamegraph(w http.ResponseWriter, req *http.Request) {
 	// JSON marshalling flame graph
 	b, err := json.Marshal(rootNode)
 	if err != nil {
-		http.Error(w, "error serializing flame graph", http.StatusInternalServerError)
+		c.String(http.StatusInternalServerError, "error serializing flame graph")
 		ui.options.UI.PrintErr(err)
 		return
 	}
 
-	ui.render(w, "flamegraph", rpt, errList, config.Labels, webArgs{
+	ui.render(c, "flamegraph", rpt, errList, config.Labels, webArgs{
 		FlameGraph: template.JS(b),
 		Nodes:      nodeArr,
 	})

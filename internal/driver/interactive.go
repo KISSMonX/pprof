@@ -34,16 +34,16 @@ var tailDigitsRE = regexp.MustCompile("[0-9]+$")
 func interactive(p *profile.Profile, o *plugin.Options) error {
 	// Enter command processing loop.
 	o.UI.SetAutoComplete(newCompleter(functionNames(p)))
-	pprofVariables.set("compact_labels", "true")
-	pprofVariables["sample_index"].help += fmt.Sprintf("Or use sample_index=name, with name in %v.\n", sampleTypes(p))
+	PProfVariables.set("compact_labels", "true")
+	PProfVariables["sample_index"].help += fmt.Sprintf("Or use sample_index=name, with name in %v.\n", sampleTypes(p))
 
 	// Do not wait for the visualizer to complete, to allow multiple
 	// graphs to be visualized simultaneously.
 	interactiveMode = true
 	shortcuts := profileShortcuts(p)
 
-	// Get all groups in pprofVariables to allow for clearer error messages.
-	groups := groupOptions(pprofVariables)
+	// Get all groups in PProfVariables to allow for clearer error messages.
+	groups := groupOptions(PProfVariables)
 
 	greetings(p, o.UI)
 	for {
@@ -69,7 +69,7 @@ func interactive(p *profile.Profile, o *plugin.Options) error {
 					}
 					value = strings.TrimSpace(value)
 				}
-				if v := pprofVariables[name]; v != nil {
+				if v := PProfVariables[name]; v != nil {
 					if name == "sample_index" {
 						// Error check sample_index=xxx to ensure xxx is a valid sample type.
 						index, err := p.SampleIndexByName(value)
@@ -79,14 +79,14 @@ func interactive(p *profile.Profile, o *plugin.Options) error {
 						}
 						value = p.SampleType[index].Type
 					}
-					if err := pprofVariables.set(name, value); err != nil {
+					if err := PProfVariables.set(name, value); err != nil {
 						o.UI.PrintErr(err)
 					}
 					continue
 				}
 				// Allow group=variable syntax by converting into variable="".
-				if v := pprofVariables[value]; v != nil && v.group == name {
-					if err := pprofVariables.set(value, ""); err != nil {
+				if v := PProfVariables[value]; v != nil && v.group == name {
+					if err := PProfVariables.set(value, ""); err != nil {
 						o.UI.PrintErr(err)
 					}
 					continue
@@ -147,7 +147,7 @@ var generateReportWrapper = generateReport // For testing purposes.
 // information before accepting interactive commands.
 func greetings(p *profile.Profile, ui plugin.UI) {
 	numLabelUnits := identifyNumLabelUnits(p, ui)
-	ropt, err := reportOptions(p, numLabelUnits, pprofVariables)
+	ropt, err := reportOptions(p, numLabelUnits, PProfVariables)
 	if err == nil {
 		rpt := report.New(p, ropt)
 		ui.Print(strings.Join(report.ProfileLabels(rpt), "\n"))
@@ -205,7 +205,7 @@ func printCurrentOptions(p *profile.Profile, ui plugin.UI) {
 		values []string
 	}
 	groups := make(map[string]*groupInfo)
-	for n, o := range pprofVariables {
+	for n, o := range PProfVariables {
 		v := o.stringValue()
 		comment := ""
 		if g := o.group; g != "" {
@@ -257,13 +257,13 @@ func parseCommandLine(input []string) ([]string, variables, error) {
 	cmd, args := input[:1], input[1:]
 	name := cmd[0]
 
-	c := pprofCommands[name]
+	c := PProfCommands[name]
 	if c == nil {
 		// Attempt splitting digits on abbreviated commands (eg top10)
 		if d := tailDigitsRE.FindString(name); d != "" && d != name {
 			name = name[:len(name)-len(d)]
 			cmd[0], args = name, append([]string{d}, args...)
-			c = pprofCommands[name]
+			c = PProfCommands[name]
 		}
 	}
 	if c == nil {
@@ -279,7 +279,7 @@ func parseCommandLine(input []string) ([]string, variables, error) {
 	}
 
 	// Copy the variables as options set in the command line are not persistent.
-	vcopy := pprofVariables.makeCopy()
+	vcopy := PProfVariables.makeCopy()
 
 	var focus, ignore string
 	for i := 0; i < len(args); i++ {
@@ -357,12 +357,12 @@ func commandHelp(args string, ui plugin.UI) {
 		return
 	}
 
-	if c := pprofCommands[args]; c != nil {
+	if c := PProfCommands[args]; c != nil {
 		ui.Print(c.help(args))
 		return
 	}
 
-	if v := pprofVariables[args]; v != nil {
+	if v := PProfVariables[args]; v != nil {
 		ui.Print(v.help + "\n")
 		return
 	}
@@ -373,7 +373,7 @@ func commandHelp(args string, ui plugin.UI) {
 // newCompleter creates an autocompletion function for a set of commands.
 func newCompleter(fns []string) func(string) string {
 	return func(line string) string {
-		v := pprofVariables
+		v := PProfVariables
 		switch tokens := strings.Fields(line); len(tokens) {
 		case 0:
 			// Nothing to complete
@@ -392,7 +392,7 @@ func newCompleter(fns []string) func(string) string {
 			fallthrough
 		default:
 			// Multiple tokens -- complete using functions, except for tags
-			if cmd := pprofCommands[tokens[0]]; cmd != nil && tokens[0] != "tags" {
+			if cmd := PProfCommands[tokens[0]]; cmd != nil && tokens[0] != "tags" {
 				lastTokenIdx := len(tokens) - 1
 				lastToken := tokens[lastTokenIdx]
 				if strings.HasPrefix(lastToken, "-") {
@@ -411,7 +411,7 @@ func newCompleter(fns []string) func(string) string {
 func matchVariableOrCommand(v variables, token string) string {
 	token = strings.ToLower(token)
 	found := ""
-	for cmd := range pprofCommands {
+	for cmd := range PProfCommands {
 		if strings.HasPrefix(cmd, token) {
 			if found != "" {
 				return ""

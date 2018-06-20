@@ -1,3 +1,4 @@
+
 [![Build Status](https://travis-ci.org/google/pprof.svg?branch=master)](https://travis-ci.org/google/pprof)
 [![codecov](https://codecov.io/gh/google/pprof/graph/badge.svg)](https://codecov.io/gh/google/pprof)
 
@@ -50,7 +51,7 @@ indicate how to format the report.
 
 ## Generate a text report of the profile, sorted by hotness:
 
-```
+```bash
 % pprof -top [main_binary] profile.pb.gz
 Where
     main_binary:  Local path to the main program binary, to enable symbolization
@@ -60,7 +61,7 @@ Where
 
 ## Generate a graph in an SVG file, and open it with a web browser:
 
-```
+```bash
 pprof -web [main_binary] profile.pb.gz
 ```
 
@@ -70,7 +71,7 @@ If no output formatting option is specified, pprof runs on interactive mode,
 where reads the profile and accepts interactive commands for visualization and
 refinement of the profile.
 
-```
+```bash
 pprof [main_binary] profile.pb.gz
 
 This will open a simple shell that takes pprof commands to generate reports.
@@ -85,7 +86,7 @@ Host is optional, and is "localhost" by default. Port is optional, and is a
 random available port by default. `-http=":"` starts a server locally at
 a random port.
 
-```
+```bash
 pprof -http=[host]:[port] [main_binary] profile.pb.gz
 ```
 
