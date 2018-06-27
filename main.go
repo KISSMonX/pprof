@@ -72,7 +72,7 @@ func getPProfRoot(c *gin.Context) {
 	}
 	log.Println("采样时间: ", seconds)
 
-	reset, _ := strconv.Atoi(c.Query(" reset")) // 1 表示重置采样, 0 表示不需要重置
+	reset, _ := strconv.Atoi(c.Query("reset")) // 1 表示重置采样, 0 表示不需要重置
 
 	source, err := config.GetServiceSource(serviceName)
 	if err != nil {

@@ -164,6 +164,7 @@ func ParseData(data []byte) (*Profile, error) {
 			return nil, fmt.Errorf("decompressing profile: %v", err)
 		}
 	}
+
 	if p, err = ParseUncompressed(data); err != nil && err != errNoData && err != errConcatProfile {
 		p, err = parseLegacy(data)
 	}

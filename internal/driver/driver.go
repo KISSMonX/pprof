@@ -31,28 +31,31 @@ import (
 )
 
 // SMMPProf 通过配置的参数项, 采集
-func SMMPProf(eo *plugin.Options, source string, seconds int) (*WebInterface, error) {
+func SMMPProf(eo *plugin.Options, fetchSource string, seconds int) (*WebInterface, error) {
 	// Remove any temporary files created during pprof processing.
 	// defer cleanupTempFiles() // FIXME: 删除临时文件?
 
 	o := setDefaults(eo)
 
-	src, cmd, err := smmParseFlags(o)
-	if err != nil {
-		return nil, err
-	}
-
 	// 设置采样目标地址以及参数
-	src.Sources = []string{source}
-	src.Seconds = seconds
+	src := &source{
+		Sources:      []string{fetchSource},
+		ExecName:     "execName",
+		BuildID:      "flagBuildID",
+		Seconds:      seconds,
+		Timeout:      60,
+		Symbolize:    "flagSymbolize",
+		HTTPHostport: "2333",
+		Comment:      "自定义的 source 结构体",
+	}
 
 	p, err := fetchProfiles(src, o)
 	if err != nil {
-		log.Println("采集服务信息失败: ", source, seconds, src)
+		log.Println("采集服务信息失败: ", fetchSource, seconds, src)
 		return nil, err
 	}
 
-	log.Printf("解析后的 src: %+v\n cmd: %+v\n", src, cmd)
+	log.Printf("解析后的 src: %+v\n cmd: %+v\n", src, "无命令行了 by MingH")
 
 	ui := MakeWebInterface(p, o)
 	for n, c := range PProfCommands {

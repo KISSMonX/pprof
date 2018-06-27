@@ -53,14 +53,14 @@ func smmParseFlags(o *plugin.Options) (*source, []string, error) {
 	// CPU profile options
 	flagSeconds := flag.Int("seconds", 30, "Length of time for dynamic profiles")
 	// Heap profile options
-	flagInUseSpace := flag.Bool("inuse_space", false, "Display in-use memory size")
-	flagInUseObjects := flag.Bool("inuse_objects", false, "Display in-use object counts")
-	flagAllocSpace := flag.Bool("alloc_space", false, "Display allocated memory size")
-	flagAllocObjects := flag.Bool("alloc_objects", false, "Display allocated object counts")
+	flagInUseSpace := flag.Bool("inuse_space", true, "Display in-use memory size")
+	flagInUseObjects := flag.Bool("inuse_objects", true, "Display in-use object counts")
+	flagAllocSpace := flag.Bool("alloc_space", true, "Display allocated memory size")
+	flagAllocObjects := flag.Bool("alloc_objects", true, "Display allocated object counts")
 	// Contention profile options
-	flagTotalDelay := flag.Bool("total_delay", false, "Display total delay at each region")
-	flagContentions := flag.Bool("contentions", false, "Display number of delays at each region")
-	flagMeanDelay := flag.Bool("mean_delay", false, "Display mean delay at each region")
+	flagTotalDelay := flag.Bool("total_delay", true, "Display total delay at each region")
+	flagContentions := flag.Bool("contentions", true, "Display number of delays at each region")
+	flagMeanDelay := flag.Bool("mean_delay", true, "Display mean delay at each region")
 	flagTools := flag.String("tools", os.Getenv("PPROF_TOOLS"), "Path for object tool pathnames")
 
 	flagHTTP := flag.String("http", "", "Present interactive web based UI at the specified http host:port")
@@ -74,7 +74,7 @@ func smmParseFlags(o *plugin.Options) (*source, []string, error) {
 		if cmd.hasParam {
 			flagParamCommands[name] = flag.String(name, "", "Generate a report in "+name+" format, matching regexp")
 		} else {
-			flagCommands[name] = flag.Bool(name, false, "Generate a report in "+name+" format")
+			flagCommands[name] = flag.Bool(name, true, "Generate a report in "+name+" format")
 		}
 	}
 

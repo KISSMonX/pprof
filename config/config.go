@@ -70,7 +70,7 @@ func GetServiceSource(serviceName string) (source string, err error) {
 		return "", errors.New("服务可能没有注册")
 	}
 
-	source = host + ":" + port
+	source = host + ":" + port + "/debug/pprof/profile"
 	return source, err
 }
 

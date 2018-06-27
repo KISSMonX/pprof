@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -59,6 +60,7 @@ func fetchProfiles(s *source, o *plugin.Options) (*profile.Profile, error) {
 
 	p, pbase, m, mbase, save, err := grabSourcesAndBases(sources, bases, o.Fetch, o.Obj, o.UI)
 	if err != nil {
+		log.Println("grabSourcesAndBases failed: ", err.Error())
 		return nil, err
 	}
 
@@ -69,12 +71,14 @@ func fetchProfiles(s *source, o *plugin.Options) (*profile.Profile, error) {
 		if s.Normalize {
 			err := p.Normalize(pbase)
 			if err != nil {
+				log.Println("Normalize failed: ", err.Error())
 				return nil, err
 			}
 		}
 		pbase.Scale(-1)
 		p, m, err = combineProfiles([]*profile.Profile{p, pbase}, []plugin.MappingSources{m, mbase})
 		if err != nil {
+			log.Println("combineProfiles failed: ", err.Error())
 			return nil, err
 		}
 	}
@@ -94,6 +98,7 @@ func fetchProfiles(s *source, o *plugin.Options) (*profile.Profile, error) {
 	if save {
 		dir, err := setTmpDir(o.UI)
 		if err != nil {
+			log.Println("setTmpDir failed: ", err.Error())
 			return nil, err
 		}
 
@@ -117,6 +122,7 @@ func fetchProfiles(s *source, o *plugin.Options) (*profile.Profile, error) {
 	}
 
 	if err := p.CheckValid(); err != nil {
+		log.Println("CheckValid failed: ", err.Error())
 		return nil, err
 	}
 
@@ -183,6 +189,7 @@ func chunkedGrab(sources []profileSource, fetch plugin.Fetcher, obj plugin.ObjTo
 		chunkP, chunkMsrc, chunkSave, chunkCount, chunkErr := concurrentGrab(sources[start:end], fetch, obj, ui)
 		switch {
 		case chunkErr != nil:
+			log.Println("concurrentGrab failed: ", chunkErr.Error())
 			return nil, nil, false, 0, chunkErr
 		case chunkP == nil:
 			continue
@@ -191,6 +198,7 @@ func chunkedGrab(sources []profileSource, fetch plugin.Fetcher, obj plugin.ObjTo
 		default:
 			p, msrc, chunkErr = combineProfiles([]*profile.Profile{p, chunkP}, []plugin.MappingSources{msrc, chunkMsrc})
 			if chunkErr != nil {
+				log.Println("combineProfiles failed: ", chunkErr.Error())
 				return nil, nil, false, 0, chunkErr
 			}
 			if chunkSave {
@@ -221,6 +229,7 @@ func concurrentGrab(sources []profileSource, fetch plugin.Fetcher, obj plugin.Ob
 	for i := range sources {
 		s := &sources[i]
 		if err := s.err; err != nil {
+			log.Println("sources.s.err: ", err.Error())
 			ui.PrintErr(s.addr + ": " + err.Error())
 			continue
 		}
@@ -231,11 +240,13 @@ func concurrentGrab(sources []profileSource, fetch plugin.Fetcher, obj plugin.Ob
 	}
 
 	if len(profiles) == 0 {
+		log.Println("len(profiles) == 0")
 		return nil, nil, false, 0, nil
 	}
 
 	p, msrc, err := combineProfiles(profiles, msrcs)
 	if err != nil {
+		log.Println("combineProfiles failed: ", err.Error())
 		return nil, nil, false, 0, err
 	}
 	return p, msrc, save, len(profiles), nil
@@ -313,9 +324,12 @@ const testSourceAddress = "pproftest.local"
 func grabProfile(s *source, source string, fetcher plugin.Fetcher, obj plugin.ObjTool, ui plugin.UI) (p *profile.Profile, msrc plugin.MappingSources, remote bool, err error) {
 	var src string
 	duration, timeout := time.Duration(s.Seconds)*time.Second, time.Duration(s.Timeout)*time.Second
+	log.Println("grabProfile: ", "duration: ", duration, "timeout: ", timeout)
+
 	if fetcher != nil {
 		p, src, err = fetcher.Fetch(source, duration, timeout)
 		if err != nil {
+			log.Println("fetcher.Fetch failed: ", err.Error())
 			return
 		}
 	}
@@ -323,11 +337,13 @@ func grabProfile(s *source, source string, fetcher plugin.Fetcher, obj plugin.Ob
 		// Fetch the profile over HTTP or from a file.
 		p, src, err = fetch(source, duration, timeout, ui)
 		if err != nil {
+			log.Println("fetch failed: ", err.Error())
 			return
 		}
 	}
 
 	if err = p.CheckValid(); err != nil {
+		log.Println("fetcher.Fetch failed: ", err.Error())
 		return
 	}
 
@@ -471,14 +487,18 @@ func fetch(source string, duration, timeout time.Duration, ui plugin.UI) (p *pro
 		}
 		f, err = fetchURL(sourceURL, timeout)
 		src = sourceURL
+		log.Println("fetchURL: ", src, err)
 	} else if isPerfFile(source) {
 		f, err = convertPerfData(source, ui)
+		log.Println("convertPerfData: ", source, err.Error())
 	} else {
 		f, err = os.Open(source)
+		log.Println("Open: ", source, err)
 	}
 	if err == nil {
 		defer f.Close()
 		p, err = profile.Parse(f)
+		log.Println(" profile.Parse: ", err)
 	}
 	return
 }
